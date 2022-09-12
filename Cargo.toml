@@ -1,0 +1,18 @@
+[package]
+name = "fixed-slice-deque"
+version = "0.1.0"
+authors = ["danielsanchezq <sanchez.quiros.daniel@gmail.com>"]
+edition = "2021"
+keywords = [
+    "deque",
+    "fixed",
+    "collection",
+    "circular",
+    "ring",
+    "buffer"
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+slice-deque = "0.3"
