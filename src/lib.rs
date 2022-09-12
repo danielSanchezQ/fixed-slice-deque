@@ -171,7 +171,7 @@ impl<T> FixedSliceDeque<T> {
     where
         F: FnMut(&T) -> bool,
     {
-        self.buffer.retain(f)
+        self.buffer.retain(f);
     }
 
     #[inline]
@@ -189,6 +189,21 @@ impl<T> FixedSliceDeque<T> {
         F: FnMut(&mut T, &mut T) -> bool,
     {
         self.buffer.dedup_by(same_bucket);
+    }
+
+    #[inline]
+    pub fn drain_filter<F>(&mut self, filter: F) -> slice_deque::DrainFilter<T, F>
+    where
+        F: FnMut(&mut T) -> bool,
+    {
+        self.buffer.drain_filter(filter)
+    }
+}
+
+impl<T: PartialEq> FixedSliceDeque<T> {
+    #[inline]
+    pub fn dedup(&mut self) {
+        self.buffer.dedup();
     }
 }
 
