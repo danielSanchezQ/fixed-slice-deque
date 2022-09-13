@@ -1635,120 +1635,657 @@ mod tests {
         for _ in v.drain(1..4).rev() {}
         assert_eq!(v, &[1.to_string(), 5.to_string()]);
     }
-    //
-    // #[test]
-    // fn vec_drain_range_zst() {
-    //     let mut v: SliceDeque<_> = sdeq![(); 5];
-    //     for _ in v.drain(1..4).rev() {}
-    //     assert_eq!(v, &[(), ()]);
-    // }
-    //
-    // #[test]
-    // fn vec_drain_inclusive_range() {
-    //     let mut v = sdeq!['a', 'b', 'c', 'd', 'e'];
-    //     for _ in v.drain(1..=3) {}
-    //     assert_eq!(v, &['a', 'e']);
-    //
-    //     let mut v: SliceDeque<_> = (0..=5).map(|x| x.to_string()).collect();
-    //     for _ in v.drain(1..=5) {}
-    //     assert_eq!(v, &["0".to_string()]);
-    //
-    //     let mut v: SliceDeque<String> = (0..=5).map(|x| x.to_string()).collect();
-    //     for _ in v.drain(0..=5) {}
-    //     assert_eq!(v, SliceDeque::<String>::new());
-    //
-    //     let mut v: SliceDeque<_> = (0..=5).map(|x| x.to_string()).collect();
-    //     for _ in v.drain(0..=3) {}
-    //     assert_eq!(v, &["4".to_string(), "5".to_string()]);
-    //
-    //     let mut v: SliceDeque<_> = (0..=1).map(|x| x.to_string()).collect();
-    //     for _ in v.drain(..=0) {}
-    //     assert_eq!(v, &["1".to_string()]);
-    // }
-    //
-    // #[test]
-    // fn vec_drain_max_vec_size() {
-    //     const M: usize = isize::max_value() as usize;
-    //     let mut v = SliceDeque::<()>::with_capacity(M);
-    //     unsafe { v.move_tail_unchecked(M as isize) };
-    //     assert_eq!(v.len(), M as usize);
-    //     for _ in v.drain(M - 1..) {}
-    //     assert_eq!(v.len(), M - 1);
-    //
-    //     let mut v = SliceDeque::<()>::with_capacity(M);
-    //     unsafe { v.move_tail_unchecked(M as isize) };
-    //     assert_eq!(v.len(), M as usize);
-    //     for _ in v.drain(M - 1..=M - 1) {}
-    //     assert_eq!(v.len(), M - 1);
-    // }
-    //
-    // #[test]
-    // #[should_panic]
-    // fn vec_drain_inclusive_out_of_bounds() {
-    //     let mut v = sdeq![1, 2, 3, 4, 5];
-    //     v.drain(5..=5);
-    // }
-    //
-    // #[test]
-    // fn vec_splice() {
-    //     let mut v = sdeq![1, 2, 3, 4, 5];
-    //     let a = [10, 11, 12];
-    //     v.splice(2..4, a.iter().cloned());
-    //     assert_eq!(v, &[1, 2, 10, 11, 12, 5]);
-    //     v.splice(1..3, Some(20));
-    //     assert_eq!(v, &[1, 20, 11, 12, 5]);
-    // }
-    //
-    // #[test]
-    // fn vec_splice_inclusive_range() {
-    //     let mut v = sdeq![1, 2, 3, 4, 5];
-    //     let a = [10, 11, 12];
-    //     let t1: SliceDeque<_> = v.splice(2..=3, a.iter().cloned()).collect();
-    //     assert_eq!(v, &[1, 2, 10, 11, 12, 5]);
-    //     assert_eq!(t1, &[3, 4]);
-    //     let t2: SliceDeque<_> = v.splice(1..=2, Some(20)).collect();
-    //     assert_eq!(v, &[1, 20, 11, 12, 5]);
-    //     assert_eq!(t2, &[2, 10]);
-    // }
-    //
-    // #[test]
-    // #[should_panic]
-    // fn vec_splice_out_of_bounds() {
-    //     let mut v = sdeq![1, 2, 3, 4, 5];
-    //     let a = [10, 11, 12];
-    //     v.splice(5..6, a.iter().cloned());
-    // }
-    //
-    // #[test]
-    // #[should_panic]
-    // fn vec_splice_inclusive_out_of_bounds() {
-    //     let mut v = sdeq![1, 2, 3, 4, 5];
-    //     let a = [10, 11, 12];
-    //     v.splice(5..=5, a.iter().cloned());
-    // }
-    //
-    // #[test]
-    // fn vec_splice_items_zero_sized() {
-    //     let mut deq = sdeq![(), (), ()];
-    //     let deq2 = sdeq![];
-    //     let t: SliceDeque<_> = deq.splice(1..2, deq2.iter().cloned()).collect();
-    //     assert_eq!(deq, &[(), ()]);
-    //     assert_eq!(t, &[()]);
-    // }
-    //
-    // #[test]
-    // fn vec_splice_unbounded() {
-    //     let mut deq = sdeq![1, 2, 3, 4, 5];
-    //     let t: SliceDeque<_> = deq.splice(.., None).collect();
-    //     assert_eq!(deq, &[]);
-    //     assert_eq!(t, &[1, 2, 3, 4, 5]);
-    // }
-    //
-    // #[test]
-    // fn vec_splice_forget() {
-    //     let mut v = sdeq![1, 2, 3, 4, 5];
-    //     let a = [10, 11, 12];
-    //     mem::forget(v.splice(2..4, a.iter().cloned()));
-    //     assert_eq!(v, &[1, 2]);
-    // }
+
+    #[test]
+    fn vec_drain_range_zst() {
+        let mut v: FixedSliceDeque<_> = fsdeq![(); 5];
+        for _ in v.drain(1..4).rev() {}
+        assert_eq!(v, &[(), ()]);
+    }
+
+    #[test]
+    fn vec_drain_inclusive_range() {
+        let mut v = fsdeq!['a', 'b', 'c', 'd', 'e'];
+        for _ in v.drain(1..=3) {}
+        assert_eq!(v, &['a', 'e']);
+
+        let mut v: FixedSliceDeque<_> = (0..=5).map(|x| x.to_string()).collect();
+        for _ in v.drain(1..=5) {}
+        assert_eq!(v, &["0".to_string()]);
+
+        let mut v: FixedSliceDeque<String> = (0..=5).map(|x| x.to_string()).collect();
+        for _ in v.drain(0..=5) {}
+        assert_eq!(v, FixedSliceDeque::<String>::new(0));
+
+        let mut v: FixedSliceDeque<_> = (0..=5).map(|x| x.to_string()).collect();
+        for _ in v.drain(0..=3) {}
+        assert_eq!(v, &["4".to_string(), "5".to_string()]);
+
+        let mut v: FixedSliceDeque<_> = (0..=1).map(|x| x.to_string()).collect();
+        for _ in v.drain(..=0) {}
+        assert_eq!(v, &["1".to_string()]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn vec_drain_inclusive_out_of_bounds() {
+        let mut v = fsdeq![1, 2, 3, 4, 5];
+        v.drain(5..=5);
+    }
+
+    #[test]
+    fn vec_append() {
+        let mut deq = fsdeq![1, 2, 3];
+        let mut deq2 = fsdeq![4, 5, 6];
+        deq.append(&mut deq2);
+        assert_eq!(deq, [4, 5, 6]);
+        assert_eq!(deq2, []);
+    }
+
+    #[test]
+    fn vec_into_iter_as_slice() {
+        let deq = fsdeq!['a', 'b', 'c'];
+        let mut into_iter = deq.into_iter();
+        assert_eq!(into_iter.as_slice(), &['a', 'b', 'c']);
+        let _ = into_iter.next().unwrap();
+        assert_eq!(into_iter.as_slice(), &['b', 'c']);
+        let _ = into_iter.next().unwrap();
+        let _ = into_iter.next().unwrap();
+        assert_eq!(into_iter.as_slice(), &[]);
+    }
+
+    #[test]
+    fn vec_into_iter_as_mut_slice() {
+        let deq = fsdeq!['a', 'b', 'c'];
+        let mut into_iter = deq.into_iter();
+        assert_eq!(into_iter.as_slice(), &['a', 'b', 'c']);
+        into_iter.as_mut_slice()[0] = 'x';
+        into_iter.as_mut_slice()[1] = 'y';
+        assert_eq!(into_iter.next().unwrap(), 'x');
+        assert_eq!(into_iter.as_slice(), &['y', 'c']);
+    }
+
+    #[test]
+    fn vec_into_iter_debug() {
+        let deq = fsdeq!['a', 'b', 'c'];
+        let into_iter = deq.into_iter();
+        let debug = format!("{:?}", into_iter);
+        assert_eq!(debug, "IntoIter(['a', 'b', 'c'])");
+    }
+
+    #[test]
+    fn vec_into_iter_count() {
+        assert_eq!(fsdeq![1, 2, 3].into_iter().count(), 3);
+    }
+
+    #[test]
+    fn vec_into_iter_clone() {
+        fn iter_equal<I: Iterator<Item = i32>>(it: I, slice: &[i32]) {
+            let v: FixedSliceDeque<i32> = it.collect();
+            assert_eq!(&v[..], slice);
+        }
+        let deq = fsdeq![1, 2, 3];
+        let mut it = deq.into_iter();
+        let it_c = it.clone();
+        iter_equal(it_c, &[1, 2, 3]);
+        assert_eq!(it.next(), Some(1));
+        let mut it = it.rev();
+        iter_equal(it.clone(), &[3, 2]);
+        assert_eq!(it.next(), Some(3));
+        iter_equal(it.clone(), &[2]);
+        assert_eq!(it.next(), Some(2));
+        iter_equal(it.clone(), &[]);
+        assert_eq!(it.next(), None);
+    }
+
+    #[test]
+    fn into_inner() {
+        let fdeque = fsdeq![1, 2, 3];
+        let deque = slice_deque::sdeq![1, 2, 3];
+        assert_eq!(fdeque.into_inner(), deque);
+    }
+
+    #[test]
+    fn drain_filter_empty() {
+        let mut deq: FixedSliceDeque<i32> = fsdeq![];
+
+        {
+            let mut iter = deq.drain_filter(|_| true);
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+        }
+        assert_eq!(deq.len(), 0);
+        assert_eq!(deq, fsdeq![]);
+    }
+
+    #[test]
+    fn drain_filter_zst() {
+        let mut deq = fsdeq![(), (), (), (), ()];
+        let initial_len = deq.len();
+        let mut count = 0;
+        {
+            let mut iter = deq.drain_filter(|_| true);
+            assert_eq!(iter.size_hint(), (0, Some(initial_len)));
+            while let Some(_) = iter.next() {
+                count += 1;
+                assert_eq!(iter.size_hint(), (0, Some(initial_len - count)));
+            }
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+        }
+
+        assert_eq!(count, initial_len);
+        assert_eq!(deq.len(), 0);
+        assert_eq!(deq, fsdeq![]);
+    }
+
+    #[test]
+    fn drain_filter_false() {
+        let mut deq = fsdeq![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+        let initial_len = deq.len();
+        let mut count = 0;
+        {
+            let mut iter = deq.drain_filter(|_| false);
+            assert_eq!(iter.size_hint(), (0, Some(initial_len)));
+            for _ in iter.by_ref() {
+                count += 1;
+            }
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+        }
+
+        assert_eq!(count, 0);
+        assert_eq!(deq.len(), initial_len);
+        assert_eq!(deq, fsdeq![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    }
+
+    #[test]
+    fn drain_filter_true() {
+        let mut deq = fsdeq![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+        let initial_len = deq.len();
+        let mut count = 0;
+        {
+            let mut iter = deq.drain_filter(|_| true);
+            assert_eq!(iter.size_hint(), (0, Some(initial_len)));
+            while let Some(_) = iter.next() {
+                count += 1;
+                assert_eq!(iter.size_hint(), (0, Some(initial_len - count)));
+            }
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+        }
+
+        assert_eq!(count, initial_len);
+        assert_eq!(deq.len(), 0);
+        assert_eq!(deq, fsdeq![]);
+    }
+
+    #[test]
+    fn drain_filter_complex() {
+        {
+            //                [+xxx++++++xxxxx++++x+x++]
+            let mut deq = fsdeq![
+                1, 2, 4, 6, 7, 9, 11, 13, 15, 17, 18, 20, 22, 24, 26, 27, 29, 31, 33, 34, 35, 36,
+                37, 39,
+            ];
+
+            let removed = deq
+                .drain_filter(|x| *x % 2 == 0)
+                .collect::<FixedSliceDeque<_>>();
+            assert_eq!(removed.len(), 10);
+            assert_eq!(removed, fsdeq![2, 4, 6, 18, 20, 22, 24, 26, 34, 36]);
+
+            assert_eq!(deq.len(), 14);
+            assert_eq!(
+                deq,
+                fsdeq![1, 7, 9, 11, 13, 15, 17, 27, 29, 31, 33, 35, 37, 39]
+            );
+        }
+
+        {
+            //                [xxx++++++xxxxx++++x+x++]
+            let mut deq = fsdeq![
+                2, 4, 6, 7, 9, 11, 13, 15, 17, 18, 20, 22, 24, 26, 27, 29, 31, 33, 34, 35, 36, 37,
+                39,
+            ];
+
+            let removed = deq
+                .drain_filter(|x| *x % 2 == 0)
+                .collect::<FixedSliceDeque<_>>();
+            assert_eq!(removed.len(), 10);
+            assert_eq!(removed, fsdeq![2, 4, 6, 18, 20, 22, 24, 26, 34, 36]);
+
+            assert_eq!(deq.len(), 13);
+            assert_eq!(
+                deq,
+                fsdeq![7, 9, 11, 13, 15, 17, 27, 29, 31, 33, 35, 37, 39]
+            );
+        }
+
+        {
+            //                [xxx++++++xxxxx++++x+x]
+            let mut deq = fsdeq![
+                2, 4, 6, 7, 9, 11, 13, 15, 17, 18, 20, 22, 24, 26, 27, 29, 31, 33, 34, 35, 36,
+            ];
+
+            let removed = deq
+                .drain_filter(|x| *x % 2 == 0)
+                .collect::<FixedSliceDeque<_>>();
+            assert_eq!(removed.len(), 10);
+            assert_eq!(removed, fsdeq![2, 4, 6, 18, 20, 22, 24, 26, 34, 36]);
+
+            assert_eq!(deq.len(), 11);
+            assert_eq!(deq, fsdeq![7, 9, 11, 13, 15, 17, 27, 29, 31, 33, 35]);
+        }
+
+        {
+            //                [xxxxxxxxxx+++++++++++]
+            let mut deq =
+                fsdeq![2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19,];
+
+            let removed = deq
+                .drain_filter(|x| *x % 2 == 0)
+                .collect::<FixedSliceDeque<_>>();
+            assert_eq!(removed.len(), 10);
+            assert_eq!(removed, fsdeq![2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+
+            assert_eq!(deq.len(), 10);
+            assert_eq!(deq, fsdeq![1, 3, 5, 7, 9, 11, 13, 15, 17, 19]);
+        }
+
+        {
+            //                [+++++++++++xxxxxxxxxx]
+            let mut deq =
+                fsdeq![1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,];
+
+            let removed = deq
+                .drain_filter(|x| *x % 2 == 0)
+                .collect::<FixedSliceDeque<_>>();
+            assert_eq!(removed.len(), 10);
+            assert_eq!(removed, fsdeq![2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+
+            assert_eq!(deq.len(), 10);
+            assert_eq!(deq, fsdeq![1, 3, 5, 7, 9, 11, 13, 15, 17, 19]);
+        }
+    }
+
+    #[test]
+    fn vecdeque_simple() {
+        let mut d = FixedSliceDeque::new(3);
+        assert_eq!(d.len(), 0);
+        assert_eq!(d.capacity(), 3);
+        d.push_front(17);
+        d.push_front(42);
+        d.push_back(137);
+        assert_eq!(d.len(), 3);
+        assert_eq!(d.capacity(), 3);
+        d.push_back(137);
+        assert_eq!(d.len(), 3);
+        assert_eq!(*d.front().unwrap(), 17);
+        assert_eq!(*d.back().unwrap(), 137);
+        let mut i = d.pop_front();
+        assert_eq!(i, Some(17));
+        i = d.pop_back();
+        assert_eq!(i, Some(137));
+        i = d.pop_back();
+        assert_eq!(i, Some(137));
+        i = d.pop_back();
+        assert_eq!(i, None);
+        assert_eq!(d.len(), 0);
+        assert_eq!(d.capacity(), 3);
+        d.push_back(3);
+        assert_eq!(d.len(), 1);
+        d.push_front(2);
+        assert_eq!(d.len(), 2);
+        d.push_back(4);
+        assert_eq!(d.len(), 3);
+        d.push_front(1);
+        assert_eq!(d.len(), 3);
+        assert_eq!(d[0], 1);
+        assert_eq!(d[1], 2);
+        assert_eq!(d[2], 3);
+    }
+
+    #[test]
+    fn vecdeque_push_front_grow() {
+        let mut deq = FixedSliceDeque::new(66);
+        for i in 0..66 {
+            deq.push_front(i);
+        }
+        assert_eq!(deq.len(), 66);
+
+        for i in 0..66 {
+            assert_eq!(deq[i], 65 - i);
+        }
+
+        let mut deq = FixedSliceDeque::new(66);
+        for i in 0..66 {
+            deq.push_back(i);
+        }
+
+        for i in 0..66 {
+            assert_eq!(deq[i], i);
+        }
+    }
+
+    #[test]
+    fn vecdeque_index() {
+        let mut deq = FixedSliceDeque::new(4);
+        for i in 1..4 {
+            deq.push_front(i);
+        }
+        assert_eq!(deq[1], 2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn vecdeque_index_out_of_bounds() {
+        let mut deq = FixedSliceDeque::new(1);
+        for i in 1..4 {
+            deq.push_front(i);
+        }
+        deq[3];
+    }
+
+    #[test]
+    fn vecdeque_with_capacity() {
+        let mut d = FixedSliceDeque::new(0);
+        d.push_back(1);
+        assert_eq!(d.len(), 1);
+        let mut d = FixedSliceDeque::new(50);
+        d.push_back(1);
+        assert_eq!(d.len(), 1);
+    }
+
+    #[test]
+    fn vecdeque_with_capacity_non_power_two() {
+        let mut d3 = FixedSliceDeque::new(3);
+        d3.push_back(1);
+
+        // X = None, | = lo
+        // [|1, X, X]
+        assert_eq!(d3.pop_front(), Some(1));
+        // [X, |X, X]
+        assert_eq!(d3.front(), None);
+
+        // [X, |3, X]
+        d3.push_back(3);
+        // [X, |3, 6]
+        d3.push_back(6);
+        // [X, X, |6]
+        assert_eq!(d3.pop_front(), Some(3));
+
+        // Pushing the lo past half way point to trigger
+        // the 'B' scenario for growth
+        // [9, X, |6]
+        d3.push_back(9);
+        // [9, 12, |6]
+        d3.push_back(12);
+
+        d3.push_back(15);
+        // There used to be a bug here about how the
+        // SliceDeque made growth assumptions about the
+        // underlying Vec which didn't hold and lead
+        // to corruption.
+        // (Vec grows to next power of two)
+        // good- [9, 12, 15, X, X, X, X, |6]
+        // bug-  [15, 12, X, X, X, |6, X, X]
+        assert_eq!(d3.pop_front(), Some(9));
+
+        // Which leads us to the following state which
+        // would be a failure case.
+        // bug-  [15, 12, X, X, X, X, |X, X]
+        assert_eq!(d3.front(), Some(&12));
+        assert_eq!(d3.capacity(), 3);
+    }
+
+    #[test]
+    fn vecdeque_iter() {
+        let mut d = FixedSliceDeque::new(10);
+        assert_eq!(d.iter().next(), None);
+        assert_eq!(d.iter().size_hint(), (0, Some(0)));
+
+        for i in 0..5 {
+            d.push_back(i);
+        }
+        {
+            let b: &[_] = &[&0, &1, &2, &3, &4];
+            assert_eq!(d.iter().collect::<Vec<_>>(), b);
+        }
+
+        for i in 6..9 {
+            d.push_front(i);
+        }
+        {
+            let b: &[_] = &[&8, &7, &6, &0, &1, &2, &3, &4];
+            assert_eq!(d.iter().collect::<Vec<_>>(), b);
+        }
+
+        let mut it = d.iter();
+        let mut len = d.len();
+        loop {
+            match it.next() {
+                None => break,
+                _ => {
+                    len -= 1;
+                    assert_eq!(it.size_hint(), (len, Some(len)))
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn vecdeque_rev_iter() {
+        let mut d = FixedSliceDeque::new(10);
+        assert_eq!(d.iter().rev().next(), None);
+
+        for i in 0..5 {
+            d.push_back(i);
+        }
+        {
+            let b: &[_] = &[&4, &3, &2, &1, &0];
+            assert_eq!(d.iter().rev().collect::<Vec<_>>(), b);
+        }
+
+        for i in 6..9 {
+            d.push_front(i);
+        }
+        let b: &[_] = &[&4, &3, &2, &1, &0, &6, &7, &8];
+        assert_eq!(d.iter().rev().collect::<Vec<_>>(), b);
+    }
+
+    #[test]
+    fn vecdeque_mut_rev_iter_wrap() {
+        let mut d = FixedSliceDeque::new(3);
+        assert!(d.iter_mut().rev().next().is_none());
+
+        d.push_back(1);
+        d.push_back(2);
+        d.push_back(3);
+        assert_eq!(d.pop_front(), Some(1));
+        d.push_back(4);
+
+        assert_eq!(
+            d.iter_mut().rev().map(|x| *x).collect::<Vec<_>>(),
+            vec![4, 3, 2]
+        );
+    }
+
+    #[test]
+    fn vecdeque_mut_iter() {
+        let mut d = FixedSliceDeque::new(3);
+        assert!(d.iter_mut().next().is_none());
+
+        for i in 0..3 {
+            d.push_front(i);
+        }
+
+        for (i, elt) in d.iter_mut().enumerate() {
+            assert_eq!(*elt, 2 - i);
+            *elt = i;
+        }
+
+        {
+            let mut it = d.iter_mut();
+            assert_eq!(*it.next().unwrap(), 0);
+            assert_eq!(*it.next().unwrap(), 1);
+            assert_eq!(*it.next().unwrap(), 2);
+            assert!(it.next().is_none());
+        }
+    }
+
+    #[test]
+    fn vecdeque_mut_rev_iter() {
+        let mut d = FixedSliceDeque::new(3);
+        assert!(d.iter_mut().rev().next().is_none());
+
+        for i in 0..3 {
+            d.push_front(i);
+        }
+
+        for (i, elt) in d.iter_mut().rev().enumerate() {
+            assert_eq!(*elt, i);
+            *elt = i;
+        }
+
+        {
+            let mut it = d.iter_mut().rev();
+            assert_eq!(*it.next().unwrap(), 0);
+            assert_eq!(*it.next().unwrap(), 1);
+            assert_eq!(*it.next().unwrap(), 2);
+            assert!(it.next().is_none());
+        }
+    }
+
+    #[test]
+    fn vecdeque_into_iter() {
+        // Empty iter
+        {
+            let d: FixedSliceDeque<i32> = FixedSliceDeque::new(0);
+            let mut iter = d.into_iter();
+
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+        }
+
+        // simple iter
+        {
+            let mut d = FixedSliceDeque::new(5);
+            for i in 0..5 {
+                d.push_back(i);
+            }
+
+            let b = vec![0, 1, 2, 3, 4];
+            assert_eq!(d.into_iter().collect::<Vec<_>>(), b);
+        }
+
+        // wrapped iter
+        {
+            let mut d = FixedSliceDeque::new(10);
+            for i in 0..5 {
+                d.push_back(i);
+            }
+            for i in 6..9 {
+                d.push_front(i);
+            }
+
+            let b = vec![8, 7, 6, 0, 1, 2, 3, 4];
+            assert_eq!(d.into_iter().collect::<Vec<_>>(), b);
+        }
+
+        // partially used
+        {
+            let mut d = FixedSliceDeque::new(10);
+            for i in 0..5 {
+                d.push_back(i);
+            }
+            for i in 6..9 {
+                d.push_front(i);
+            }
+
+            let mut it = d.into_iter();
+            assert_eq!(it.size_hint(), (8, Some(8)));
+            assert_eq!(it.next(), Some(8));
+            assert_eq!(it.size_hint(), (7, Some(7)));
+            assert_eq!(it.next_back(), Some(4));
+            assert_eq!(it.size_hint(), (6, Some(6)));
+            assert_eq!(it.next(), Some(7));
+            assert_eq!(it.size_hint(), (5, Some(5)));
+        }
+    }
+
+    #[test]
+    fn vecdeque_drain() {
+        // Empty iter
+        {
+            let mut d: FixedSliceDeque<i32> = FixedSliceDeque::new(0);
+
+            {
+                let mut iter = d.drain(..);
+
+                assert_eq!(iter.size_hint(), (0, Some(0)));
+                assert_eq!(iter.next(), None);
+                assert_eq!(iter.size_hint(), (0, Some(0)));
+            }
+
+            assert!(d.is_empty());
+        }
+
+        // simple iter
+        {
+            let mut d = FixedSliceDeque::new(5);
+            for i in 0..5 {
+                d.push_back(i);
+            }
+
+            assert_eq!(d.drain(..).collect::<Vec<_>>(), [0, 1, 2, 3, 4]);
+            assert!(d.is_empty());
+        }
+
+        // wrapped iter
+        {
+            let mut d = FixedSliceDeque::new(10);
+            for i in 0..5 {
+                d.push_back(i);
+            }
+            for i in 6..9 {
+                d.push_front(i);
+            }
+
+            assert_eq!(d.drain(..).collect::<Vec<_>>(), [8, 7, 6, 0, 1, 2, 3, 4]);
+            assert!(d.is_empty());
+        }
+
+        // partially used
+        {
+            let mut d: FixedSliceDeque<_> = FixedSliceDeque::new(10);
+            for i in 0..5 {
+                d.push_back(i);
+            }
+            for i in 6..9 {
+                d.push_front(i);
+            }
+
+            {
+                let mut it = d.drain(..);
+                assert_eq!(it.size_hint(), (8, Some(8)));
+                assert_eq!(it.next(), Some(8));
+                assert_eq!(it.size_hint(), (7, Some(7)));
+                assert_eq!(it.next_back(), Some(4));
+                assert_eq!(it.size_hint(), (6, Some(6)));
+                assert_eq!(it.next(), Some(7));
+                assert_eq!(it.size_hint(), (5, Some(5)));
+            }
+            assert!(d.is_empty());
+        }
+    }
 }
