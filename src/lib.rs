@@ -1,7 +1,53 @@
+//! A fixed size double-ended queue that `Deref`s into a slice.
+//! For keeping the fixed queue size items pushed out of bounds are pop and returned in inserting
+//! operations.
+//!
+//! ## Example:
+//! ```txt
+//! `X = None`
+//! +---+---+---+
+//! | X | X | X |
+//! +---+---+---+
+//!
+//! => push_back(1)
+//!
+//! +---+---+---+
+//! | 1 | X | X |
+//! +---+---+---+
+//!
+//! => push_front(2)
+//!
+//! +---+---+---+
+//! | 2 | 1 | X |
+//! +---+---+---+
+//!
+//! => push_back(3)
+//!
+//! +---+---+---+
+//! | 2 | 1 | 3 |
+//! +---+---+---+
+//!
+//! => push_back(4)
+//!
+//! +---+---+---+
+//! | 1 | 3 | 4 | => return Some(2)
+//! +---+---+---+
+//!```
+//!
+//! It is implemented as a wrapper over [`SliceDeque`] [**`slice-deque`** crate](<https://crates.io/crates/slice-deque>)
+//!
+//! Almost every orignal [`SliceDeque`] method is wrapped.
+//! Please refer to it's twin method [documentation](https://docs.rs/slice-deque/latest/slice_deque/)
+//! for internal functionality.
+
 use slice_deque::SliceDeque;
 use std::ops::{Deref, DerefMut};
 use std::slice;
 
+/// A fixed size double-ended queue that derefs into a slice.
+/// It maintains the size by poping out of bounds items in inserting operations.
+///
+/// It is implemented as a wrapper over [`SliceDeque`]
 #[derive(Debug, Clone, Eq, Hash, Default)]
 pub struct FixedSliceDeque<T> {
     buffer: SliceDeque<T>,
@@ -10,14 +56,13 @@ pub struct FixedSliceDeque<T> {
 
 /// Creates a [`FixedSliceDeque`] containing the arguments.
 ///
-/// `fsdeq!` allows `SliceDeque`s to be defined with the same syntax as array
+/// `fsdeq!` allows `FixedSliceDeque`s to be defined with the same syntax as array
 /// expressions. There are two forms of this macro:
 ///
-/// - Create a [`SliceDeque`] containing a given list of elements:
+/// - Create a [`FixedSliceDeque`] containing a given list of elements:
 ///
 /// ```
-/// # #[macro_use] extern crate fixed_slice_deque;
-/// # use fixed_slice_deque::FixedSliceDeque;
+/// # use fixed_slice_deque::{FixedSliceDeque, fsdeq};
 /// # fn main() {
 /// let v: FixedSliceDeque<i32> = fsdeq![1, 2, 3];
 /// assert_eq!(v[0], 1);
@@ -26,11 +71,10 @@ pub struct FixedSliceDeque<T> {
 /// # }
 /// ```
 ///
-/// - Create a [`SliceDeque`] from a given element and size:
+/// - Create a [`FixedSliceDeque`] from a given element and size:
 ///
 /// ```
-/// # #[macro_use] extern crate fixed_slice_deque;
-/// # use fixed_slice_deque::FixedSliceDeque;
+/// # use fixed_slice_deque::{FixedSliceDeque, fsdeq};
 /// # fn main() {
 /// let v = fsdeq![7; 3];
 /// assert_eq!(v, [7, 7, 7]);
@@ -43,7 +87,7 @@ pub struct FixedSliceDeque<T> {
 ///
 /// This will use `clone` to duplicate an expression, so one should be careful
 /// using this with types having a nonstandard `Clone` implementation. For
-/// example, `sdeq![Rc::new(1); 5]` will create a deque of five references
+/// example, `fsdeq![Rc::new(1); 5]` will create a deque of five references
 /// to the same boxed integer value, not five references pointing to
 /// independently boxed integers.
 ///
