@@ -1016,6 +1016,7 @@ macro_rules! __impl_slice_eq1 {
         __impl_slice_eq1! { $Lhs, $Rhs, Sized }
     };
     ($Lhs:ty, $Rhs:ty, $Bound:ident) => {
+        #[allow(clippy::extra_unused_lifetimes)]
         impl<'a, 'b, A: $Bound, B> PartialEq<$Rhs> for $Lhs
         where
             A: PartialEq<B>,
@@ -1027,7 +1028,6 @@ macro_rules! __impl_slice_eq1 {
         }
     };
 }
-
 __impl_slice_eq1! { FixedSliceDeque<A>, FixedSliceDeque<B> }
 __impl_slice_eq1! { FixedSliceDeque<A>, SliceDeque<B> }
 __impl_slice_eq1! { FixedSliceDeque<A>, &'b [B] }
