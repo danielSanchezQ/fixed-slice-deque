@@ -3,6 +3,9 @@ name = "fixed-slice-deque"
 version = "0.1.0"
 authors = ["danielsanchezq <sanchez.quiros.daniel@gmail.com>"]
 edition = "2021"
+license-file = "License"
+readme = "README.md"
+description = "A fixed size deque implementation"
 keywords = [
     "deque",
     "fixed",
@@ -10,6 +13,10 @@ keywords = [
     "circular",
     "ring",
     "buffer"
+]
+categories = ["data-structures"]
+exclude = [
+    ".github",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
