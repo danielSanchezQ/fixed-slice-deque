@@ -1062,6 +1062,31 @@ mod tests {
     }
 
     #[test]
+    fn try_push_front() {
+        let mut deque = FixedSliceDeque::new(0);
+        assert_eq!(deque.try_push_front(1), Err(1));
+    }
+
+    #[test]
+    fn try_push_back() {
+        let mut deque = FixedSliceDeque::new(0);
+        assert_eq!(deque.try_push_back(1), Err(1));
+    }
+
+    #[test]
+    fn front_back_mut() {
+        let mut v = fsdeq![1];
+        assert_eq!(v.front_mut(), Some(&mut 1));
+        assert_eq!(v.back_mut(), Some(&mut 1));
+    }
+
+    #[test]
+    fn mut_slice() {
+        let mut v = fsdeq![1];
+        assert_eq!(v.as_mut_slice(), &mut [1]);
+    }
+
+    #[test]
     fn push_pop_back() {
         for size in SIZES_TO_TEST.iter().copied() {
             let mut v: FixedSliceDeque<_> = (0..size).collect();
@@ -1096,6 +1121,29 @@ mod tests {
                 assert!(last.is_some());
             }
         }
+    }
+
+    #[test]
+    fn from_slice_deque() {
+        let deque = slice_deque::sdeq![1, 2, 3];
+        let v: FixedSliceDeque<_> = deque.clone().into();
+        assert_eq!(&v, &deque);
+        let v: FixedSliceDeque<_> = FixedSliceDeque::from_slice_deque(deque.clone());
+        assert_eq!(&v, &deque);
+    }
+
+    #[test]
+    fn from_slice() {
+        let deque = [1, 2, 3];
+        let v: FixedSliceDeque<_> = deque.clone().as_slice().into();
+        assert_eq!(&v, &deque);
+    }
+
+    #[test]
+    fn from_slice_mut() {
+        let deque = [1, 2, 3];
+        let v: FixedSliceDeque<_> = deque.clone().as_mut_slice().into();
+        assert_eq!(&v, &deque);
     }
 
     #[test]
@@ -1135,6 +1183,34 @@ mod tests {
 
             v.resize(size, 3);
             let v_ref: FixedSliceDeque<_> = (0..size).map(|_| 3usize).collect();
+            assert_eq!(v.len(), size);
+            assert_eq!(v.capacity(), size);
+            assert_eq!(v_ref.len(), size);
+            assert_eq!(v.as_slice(), v_ref.as_slice());
+        }
+    }
+
+    #[test]
+    fn resize_default() {
+        for size in SIZES_TO_TEST.iter().copied() {
+            let mut v: FixedSliceDeque<_> = (0..size).collect();
+            let v_ref: FixedSliceDeque<_> = (0..size / 2).collect();
+            v.resize_default(size / 2);
+            assert_eq!(v.len(), size / 2);
+            assert_eq!(v.capacity(), size / 2);
+            assert_eq!(v.as_slice(), v_ref.as_slice());
+
+            v.resize_default(size);
+            assert_eq!(v.len(), size);
+            assert_eq!(v.capacity(), size);
+            assert_eq!(v.as_slice().last(), Some(&0));
+
+            v.resize_default(0);
+            assert_eq!(v.len(), 0);
+            assert_eq!(v.capacity(), 0);
+
+            v.resize_default(size);
+            let v_ref: FixedSliceDeque<_> = (0..size).map(|_| 0).collect();
             assert_eq!(v.len(), size);
             assert_eq!(v.capacity(), size);
             assert_eq!(v_ref.len(), size);
@@ -1679,6 +1755,19 @@ mod tests {
         let mut deq2 = fsdeq![4, 5, 6];
         deq.append(&mut deq2);
         assert_eq!(deq, [4, 5, 6]);
+        assert_eq!(deq2, []);
+    }
+
+    #[test]
+    fn vec_append_small() {
+        let mut v = FixedSliceDeque::new(10);
+        let mut deq = fsdeq![1, 2, 3];
+        let mut deq2 = fsdeq![4, 5, 6];
+        v.append(&mut deq);
+        v.append(&mut deq2);
+        assert_eq!(v, [1, 2, 3, 4, 5, 6]);
+        assert_eq!(v.capacity(), 10);
+        assert_eq!(deq, []);
         assert_eq!(deq2, []);
     }
 
