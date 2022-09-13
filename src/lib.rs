@@ -3,34 +3,61 @@
 //! operations.
 //!
 //! ## Example:
+//! Initialize state, empty, with fixed size of `3`
 //! ```txt
 //! `X = None`
 //! +---+---+---+
 //! | X | X | X |
 //! +---+---+---+
+//!```
 //!
+//! Pushing `1` to the back, since it is empty, `1` is the only item in the deque  
+//! ```txt
 //! => push_back(1)
 //!
 //! +---+---+---+
 //! | 1 | X | X |
 //! +---+---+---+
+//!```
 //!
+//! Push `2` to the front (left)
+//!
+//! ```txt
 //! => push_front(2)
 //!
 //! +---+---+---+
 //! | 2 | 1 | X |
 //! +---+---+---+
+//!```
 //!
+//! Push again to the back, a single `3`. The deque now [is full](`FixedSliceDeque::is_full`)
+//!
+//! ```txt
 //! => push_back(3)
 //!
 //! +---+---+---+
 //! | 2 | 1 | 3 |
 //! +---+---+---+
+//!```
 //!
+//! We try to add a new item at the back, but we would have one extra, the first item (`2`) is pop
+//! to the left and returned. We keep the elements and the fixed size
+//!
+//! ```txt
 //! => push_back(4)
 //!
 //! +---+---+---+
 //! | 1 | 3 | 4 | => return Some(2)
+//! +---+---+---+
+//!```
+//!
+//! The same happens when pushing to the front again, the back-most (right) item is pop and returned
+//!
+//! ```txt
+//! => push_front(5)
+//!
+//! +---+---+---+
+//! | 5 | 1 | 3 | => return Some(4)
 //! +---+---+---+
 //!```
 //!
