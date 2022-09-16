@@ -7,8 +7,8 @@ license-file = "License"
 readme = "README.md"
 description = "A fixed size deque implementation"
 documentation = "https://docs.rs/crate/fixed-slice-deque/"
-homepage = "https://github.com/danielsanchezq/fixed-slice_deque"
-repository = "https://github.com/danielsanchezq/fixed-slice_deque"
+homepage = "https://github.com/danielsanchezq/fixed-slice-deque"
+repository = "https://github.com/danielsanchezq/fixed-slice-deque"
 keywords = [
     "deque",
     "fixed",
