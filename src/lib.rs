@@ -232,13 +232,15 @@ impl<T> FixedSliceDeque<T> {
     /// Extracts a slice containing the entire deque.
     #[inline]
     pub fn as_slice(&self) -> &[T] {
-        self.buffer.as_slice()
+        let len = self.len();
+        &self.buffer.as_slice()[..len]
     }
 
     /// Extracts a mutable slice containing the entire deque.
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        self.buffer.as_mut_slice()
+        let len = self.len();
+        &mut self.buffer.as_mut_slice()[..len]
     }
 
     /// Moves all the elements of `other` into `Self`, leaving `other` empty.
@@ -2447,5 +2449,12 @@ mod tests {
             }
             assert!(d.is_empty());
         }
+    }
+
+    #[test]
+    fn deref_slice_size() {
+        let mut deq = fsdeq![1, 2, 3, 4, 5];
+        assert_eq!(deq.as_slice().len(), 5);
+        assert_eq!(deq.as_mut_slice().len(), 5);
     }
 }
