@@ -8,7 +8,7 @@
 ### Add the library dependency
 ```toml
 [dependencies]
-fixed-slice-deque = "0.5"
+fixed-slice-deque = "0.1.0-beta2"
 ```
 
 
