@@ -67,17 +67,21 @@
 //! Please refer to it's twin method [documentation](https://docs.rs/slice-deque/latest/slice_deque/)
 //! for internal functionality.
 
-use slice_deque::SliceDeque;
+mod drain_filter;
+
+pub use drain_filter::DrainFilter;
+
+use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::slice;
 
 /// A fixed size double-ended queue that derefs into a slice.
 /// It maintains the size by poping out of bounds items in inserting operations.
 ///
-/// It is implemented as a wrapper over [`SliceDeque`]
+/// It is implemented as a wrapper over [`VecDeque`]
 #[derive(Debug, Clone, Eq, Hash, Default)]
 pub struct FixedSliceDeque<T> {
-    buffer: SliceDeque<T>,
+    pub(crate) buffer: VecDeque<T>,
     capacity: usize,
 }
 
@@ -120,7 +124,6 @@ pub struct FixedSliceDeque<T> {
 ///
 /// ```
 /// # #[macro_use] extern crate fixed_slice_deque;
-/// # use slice_deque::SliceDeque;
 /// # use std::rc::Rc;
 /// # fn main() {
 /// let v = fsdeq![Rc::new(1_i32); 5];
@@ -131,7 +134,7 @@ pub struct FixedSliceDeque<T> {
 /// # }
 /// ```
 ///
-/// [`SliceDeque`]: struct.SliceDeque.html
+/// [`VecDeque`]: std::collections::VecDeque
 #[macro_export]
 macro_rules! fsdeq {
     ($elem:expr; $n:expr) => (
@@ -143,8 +146,8 @@ macro_rules! fsdeq {
     );
     ($($x:expr),*) => (
         {
-            let sdeq = ::slice_deque::sdeq![$($x),*];
-            let deq = $crate::FixedSliceDeque::from_slice_deque(sdeq);
+            let vdeq = std::collections::VecDeque::from(vec![$($x),*]);
+            let deq = $crate::FixedSliceDeque::from_vec_deque(vdeq);
             deq
         }
     );
@@ -164,22 +167,23 @@ impl<T> FixedSliceDeque<T> {
     #[inline]
     pub fn new(size: usize) -> Self {
         Self {
-            buffer: SliceDeque::with_capacity(size),
+            buffer: VecDeque::with_capacity(size),
             capacity: size,
         }
     }
 
-    /// Create an new fixed size deque with capacity to hold `n` elements from a [`SliceDeque`].
+    /// Create an new fixed size deque with capacity to hold `n` elements from a [`VecDeque`].
     ///
     /// # Examples
     ///
     /// ```rust
     /// # use fixed_slice_deque::FixedSliceDeque;
-    /// # use slice_deque::sdeq;
-    /// let deq = FixedSliceDeque::from_slice_deque(sdeq![1, 2, 3]);
+    /// # use std::collections::VecDeque;
+    /// let deq = FixedSliceDeque::from_vec_deque(VecDeque::from(vec![1, 2, 3]));
     /// # let o: FixedSliceDeque<u32> = deq;
     /// ```
-    pub fn from_slice_deque(deque: SliceDeque<T>) -> Self {
+    pub fn from_vec_deque(mut deque: VecDeque<T>) -> Self {
+        deque.make_contiguous();
         Self {
             capacity: deque.len(),
             buffer: deque,
@@ -232,15 +236,17 @@ impl<T> FixedSliceDeque<T> {
     /// Extracts a slice containing the entire deque.
     #[inline]
     pub fn as_slice(&self) -> &[T] {
-        let len = self.len();
-        &self.buffer.as_slice()[..len]
+        // Safety: We maintain the invariant that buffer is always contiguous
+        // by calling make_contiguous() after any operation that could make it non-contiguous
+        let (front, back) = self.buffer.as_slices();
+        debug_assert!(back.is_empty(), "buffer should always be contiguous");
+        front
     }
 
     /// Extracts a mutable slice containing the entire deque.
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        let len = self.len();
-        &mut self.buffer.as_mut_slice()[..len]
+        self.buffer.make_contiguous()
     }
 
     /// Moves all the elements of `other` into `Self`, leaving `other` empty.
@@ -265,13 +271,19 @@ impl<T> FixedSliceDeque<T> {
         if other.len() + self.len() <= self.capacity {
             self.buffer.append(&mut other.buffer);
         } else {
-            other
-                .buffer
-                .truncate_back(other.len() - (self.capacity - self.len()));
-            self.buffer.clear();
+            // Combined would exceed capacity - keep only the last `capacity` elements
+            let total = self.len() + other.len();
+            let to_keep = self.capacity;
+            let to_skip = total - to_keep;
+
+            // Clear self and append, then skip from front
             self.buffer.append(&mut other.buffer);
+            for _ in 0..to_skip {
+                self.buffer.pop_front();
+            }
         }
         other.buffer.clear();
+        self.buffer.make_contiguous();
     }
 
     /// Provides a reference to the first element, or `None` if the deque is
@@ -375,6 +387,7 @@ impl<T> FixedSliceDeque<T> {
     pub fn push_front(&mut self, value: T) -> Option<T> {
         let ret = self.is_full().then(|| self.buffer.pop_back()).flatten();
         self.buffer.push_front(value);
+        self.buffer.make_contiguous();
         ret
     }
 
@@ -395,6 +408,9 @@ impl<T> FixedSliceDeque<T> {
     pub fn push_back(&mut self, value: T) -> Option<T> {
         let ret = self.is_full().then(|| self.buffer.pop_front()).flatten();
         self.buffer.push_back(value);
+        if ret.is_some() {
+            self.buffer.make_contiguous();
+        }
         ret
     }
 
@@ -457,7 +473,11 @@ impl<T> FixedSliceDeque<T> {
     /// ```
     #[inline]
     pub fn pop_front(&mut self) -> Option<T> {
-        self.buffer.pop_front()
+        let ret = self.buffer.pop_front();
+        if ret.is_some() {
+            self.buffer.make_contiguous();
+        }
+        ret
     }
 
     /// Removes the last element from the deque and returns it, or `None` if it
@@ -500,7 +520,11 @@ impl<T> FixedSliceDeque<T> {
     /// ```
     #[inline]
     pub fn truncate_front(&mut self, len: usize) {
-        self.buffer.truncate_front(len.min(self.capacity));
+        let target_len = len.min(self.capacity);
+        while self.buffer.len() > target_len {
+            self.buffer.pop_front();
+        }
+        self.buffer.make_contiguous();
     }
 
     /// Shortens the deque by removing excess elements from the back.
@@ -521,7 +545,7 @@ impl<T> FixedSliceDeque<T> {
     /// ```
     #[inline]
     pub fn truncate_back(&mut self, len: usize) {
-        self.buffer.truncate_back(len.min(self.capacity));
+        self.buffer.truncate(len.min(self.capacity));
     }
 
     /// Removes all values from the deque.
@@ -571,16 +595,17 @@ impl<T> FixedSliceDeque<T> {
     /// # }
     /// ```
     #[inline]
-    pub fn drain<R>(&mut self, range: R) -> slice_deque::Drain<T>
+    #[allow(mismatched_lifetime_syntaxes)]
+    pub fn drain<R>(&mut self, range: R) -> std::collections::vec_deque::Drain<T>
     where
         R: std::ops::RangeBounds<usize>,
     {
         self.buffer.drain(range)
     }
 
-    /// Extracts a the inner [`SliceDeque`] buffer, consuming the [`FixedSliceDeque`]
+    /// Extracts a the inner [`VecDeque`] buffer, consuming the [`FixedSliceDeque`]
     #[inline]
-    pub fn into_inner(self) -> SliceDeque<T> {
+    pub fn into_inner(self) -> VecDeque<T> {
         self.buffer
     }
 
@@ -615,6 +640,7 @@ impl<T> FixedSliceDeque<T> {
         }
         let ret = is_full.then(|| self.pop_back()).flatten();
         self.buffer.insert(index, element);
+        self.buffer.make_contiguous();
         ret
     }
 
@@ -636,7 +662,7 @@ impl<T> FixedSliceDeque<T> {
     /// ```
     #[inline]
     pub fn remove(&mut self, index: usize) -> T {
-        self.buffer.remove(index)
+        self.buffer.remove(index).expect("index out of bounds")
     }
 
     /// Retains only the elements specified by the predicate.
@@ -680,12 +706,12 @@ impl<T> FixedSliceDeque<T> {
     /// # }
     /// ```
     #[inline]
-    pub fn dedup_by_key<F, K>(&mut self, key: F)
+    pub fn dedup_by_key<F, K>(&mut self, mut key: F)
     where
         F: FnMut(&mut T) -> K,
         K: PartialEq,
     {
-        self.buffer.dedup_by_key(key);
+        self.dedup_by(|a, b| key(a) == key(b));
     }
 
     /// Removes all but the first of consecutive elements in the deque
@@ -712,11 +738,29 @@ impl<T> FixedSliceDeque<T> {
     /// # }
     /// ```
     #[inline]
-    pub fn dedup_by<F>(&mut self, same_bucket: F)
+    pub fn dedup_by<F>(&mut self, mut same_bucket: F)
     where
         F: FnMut(&mut T, &mut T) -> bool,
     {
-        self.buffer.dedup_by(same_bucket);
+        let len = self.buffer.len();
+        if len < 2 {
+            return;
+        }
+        // Make contiguous first to simplify comparisons
+        self.buffer.make_contiguous();
+        let mut i = 0;
+        while i + 1 < self.buffer.len() {
+            let should_remove = {
+                let slice = self.buffer.make_contiguous();
+                let (left, right) = slice.split_at_mut(i + 1);
+                same_bucket(&mut right[0], &mut left[i])
+            };
+            if should_remove {
+                self.buffer.remove(i + 1);
+            } else {
+                i += 1;
+            }
+        }
     }
 
     /// Creates an iterator which uses a closure to determine if an element
@@ -779,11 +823,19 @@ impl<T> FixedSliceDeque<T> {
     /// # }
     /// ```
     #[inline]
-    pub fn drain_filter<F>(&mut self, filter: F) -> slice_deque::DrainFilter<T, F>
+    #[allow(mismatched_lifetime_syntaxes)]
+    pub fn drain_filter<F>(&mut self, filter: F) -> DrainFilter<T, F>
     where
         F: FnMut(&mut T) -> bool,
     {
-        self.buffer.drain_filter(filter)
+        let old_len = self.len();
+        DrainFilter {
+            deque: self,
+            filter,
+            old_len,
+            idx: 0,
+            del: 0,
+        }
     }
 }
 
@@ -811,7 +863,7 @@ impl<T: PartialEq> FixedSliceDeque<T> {
     /// ```
     #[inline]
     pub fn dedup(&mut self) {
-        self.buffer.dedup();
+        self.dedup_by(|a, b| a == b);
     }
 
     /// Removes the first instance of `item` from the deque if the item exists.
@@ -831,7 +883,8 @@ impl<T: PartialEq> FixedSliceDeque<T> {
     /// ```
     #[inline]
     pub fn remove_item(&mut self, item: &T) -> Option<T> {
-        self.buffer.remove_item(item)
+        let pos = self.buffer.iter().position(|x| x == item)?;
+        self.buffer.remove(pos)
     }
 }
 
@@ -860,7 +913,7 @@ impl<T: Clone> FixedSliceDeque<T> {
     #[inline]
     pub fn extend_from_slice(&mut self, other: &[T]) {
         self.capacity = self.len() + other.len();
-        self.buffer.extend_from_slice(other);
+        self.buffer.extend(other.iter().cloned());
     }
 
     /// Modifies the [`FixedSliceDeque`] in-place so that `capacity` is equal to
@@ -923,7 +976,13 @@ impl<T: Default> FixedSliceDeque<T> {
     #[inline]
     pub fn resize_default(&mut self, new_capacity: usize) {
         self.capacity = new_capacity;
-        self.buffer.resize_default(new_capacity);
+        if new_capacity < self.buffer.len() {
+            self.buffer.truncate(new_capacity);
+        } else {
+            while self.buffer.len() < new_capacity {
+                self.buffer.push_back(Default::default());
+            }
+        }
     }
 }
 
@@ -937,13 +996,13 @@ impl<T> Deref for FixedSliceDeque<T> {
 
 impl<T> DerefMut for FixedSliceDeque<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.buffer.as_mut_slice()
+        self.buffer.make_contiguous()
     }
 }
 
-impl<T> From<SliceDeque<T>> for FixedSliceDeque<T> {
-    fn from(deque: SliceDeque<T>) -> Self {
-        Self::from_slice_deque(deque)
+impl<T> From<VecDeque<T>> for FixedSliceDeque<T> {
+    fn from(deque: VecDeque<T>) -> Self {
+        Self::from_vec_deque(deque)
     }
 }
 
@@ -951,7 +1010,7 @@ impl<'a, T: Clone> From<&'a [T]> for FixedSliceDeque<T> {
     fn from(slice: &'a [T]) -> Self {
         Self {
             capacity: slice.len(),
-            buffer: SliceDeque::from(slice),
+            buffer: VecDeque::from(slice.to_vec()),
         }
     }
 }
@@ -960,17 +1019,69 @@ impl<'a, T: Clone> From<&'a mut [T]> for FixedSliceDeque<T> {
     fn from(slice: &'a mut [T]) -> Self {
         Self {
             capacity: slice.len(),
-            buffer: SliceDeque::from(slice),
+            buffer: VecDeque::from(slice.to_vec()),
         }
+    }
+}
+
+/// An owning iterator over the elements of a `FixedSliceDeque`.
+pub struct IntoIter<T> {
+    inner: VecDeque<T>,
+}
+
+impl<T: Clone> Clone for IntoIter<T> {
+    fn clone(&self) -> Self {
+        IntoIter {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T> IntoIter<T> {
+    /// Returns the remaining items as a slice.
+    pub fn as_slice(&self) -> &[T] {
+        self.inner.as_slices().0
+    }
+
+    /// Returns the remaining items as a mutable slice.
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        self.inner.as_mut_slices().0
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        self.inner.pop_front()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.inner.len();
+        (len, Some(len))
+    }
+}
+
+impl<T> ExactSizeIterator for IntoIter<T> {}
+
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<T> {
+        self.inner.pop_back()
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for IntoIter<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("IntoIter").field(&self.as_slice()).finish()
     }
 }
 
 impl<T> IntoIterator for FixedSliceDeque<T> {
     type Item = T;
-    type IntoIter = slice_deque::IntoIter<T>;
+    type IntoIter = IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.buffer.into_iter()
+        IntoIter { inner: self.buffer }
     }
 }
 
@@ -997,19 +1108,21 @@ impl<T> Extend<T> for FixedSliceDeque<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         self.buffer.extend(iter);
         self.capacity = self.buffer.len();
+        self.buffer.make_contiguous();
     }
 }
 
 impl<'a, T: 'a + Copy> Extend<&'a T> for FixedSliceDeque<T> {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
-        self.buffer.extend(iter.into_iter());
+        self.buffer.extend(iter);
         self.capacity = self.buffer.len();
+        self.buffer.make_contiguous();
     }
 }
 
 impl<T> std::iter::FromIterator<T> for FixedSliceDeque<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self::from_slice_deque(SliceDeque::from_iter(iter.into_iter()))
+        Self::from_vec_deque(VecDeque::from_iter(iter))
     }
 }
 
@@ -1025,13 +1138,28 @@ macro_rules! __impl_slice_eq1 {
         {
             #[inline]
             fn eq(&self, other: &$Rhs) -> bool {
-                self.buffer[..] == other[..]
+                if self.len() != other.len() {
+                    return false;
+                }
+                self.iter().zip(other.iter()).all(|(a, b)| a == b)
             }
         }
     };
 }
-__impl_slice_eq1! { FixedSliceDeque<A>, FixedSliceDeque<B> }
-__impl_slice_eq1! { FixedSliceDeque<A>, SliceDeque<B> }
+
+impl<A, B> PartialEq<FixedSliceDeque<B>> for FixedSliceDeque<A>
+where
+    A: PartialEq<B>,
+{
+    #[inline]
+    fn eq(&self, other: &FixedSliceDeque<B>) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+        self.iter().zip(other.iter()).all(|(a, b)| a == b)
+    }
+}
+
 __impl_slice_eq1! { FixedSliceDeque<A>, &'b [B] }
 __impl_slice_eq1! { FixedSliceDeque<A>, &'b mut [B] }
 __impl_slice_eq1! { FixedSliceDeque<A>, Vec<B> }
@@ -1057,7 +1185,7 @@ array_impls! {
 mod tests {
     use crate::FixedSliceDeque;
     use std::cell::RefCell;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, VecDeque};
     use std::rc::Rc;
 
     const SIZES_TO_TEST: &[usize] = &[2, 4, 8, 16, 32, 64, 128];
@@ -1197,12 +1325,12 @@ mod tests {
     }
 
     #[test]
-    fn from_slice_deque() {
-        let deque = slice_deque::sdeq![1, 2, 3];
+    fn from_vec_deque() {
+        let deque = VecDeque::from(vec![1, 2, 3]);
         let v: FixedSliceDeque<_> = deque.clone().into();
-        assert_eq!(&v, &deque);
-        let v: FixedSliceDeque<_> = FixedSliceDeque::from_slice_deque(deque.clone());
-        assert_eq!(&v, &deque);
+        assert_eq!(&v[..], &deque.iter().copied().collect::<Vec<_>>()[..]);
+        let v: FixedSliceDeque<_> = FixedSliceDeque::from_vec_deque(deque.clone());
+        assert_eq!(&v[..], &deque.iter().copied().collect::<Vec<_>>()[..]);
     }
 
     #[test]
@@ -1309,7 +1437,7 @@ mod tests {
         deq.push_back(3);
         deq.push_back(4);
         for num in deq.iter_mut() {
-            *num = *num - 2;
+            *num -= 2;
         }
         let b: &[_] = &[&mut 3, &mut 1, &mut 2];
         assert_eq!(&deq.iter_mut().collect::<Vec<&mut i32>>()[..], b);
@@ -1595,7 +1723,7 @@ mod tests {
     #[test]
     fn vec_vec_truncate_drop() {
         static mut DROPS: u32 = 0;
-        struct Elem(i32);
+        struct Elem;
         impl Drop for Elem {
             fn drop(&mut self) {
                 unsafe {
@@ -1604,7 +1732,7 @@ mod tests {
             }
         }
 
-        let mut v = fsdeq![Elem(1), Elem(2), Elem(3), Elem(4), Elem(5)];
+        let mut v = fsdeq![Elem, Elem, Elem, Elem, Elem];
         assert_eq!(unsafe { DROPS }, 0);
         v.truncate_back(3);
         assert_eq!(unsafe { DROPS }, 2);
@@ -1615,7 +1743,7 @@ mod tests {
     #[test]
     fn vec_vec_truncate_front_drop() {
         static mut DROPS: u32 = 0;
-        struct Elem(i32);
+        struct Elem;
         impl Drop for Elem {
             fn drop(&mut self) {
                 unsafe {
@@ -1624,7 +1752,7 @@ mod tests {
             }
         }
 
-        let mut v = fsdeq![Elem(1), Elem(2), Elem(3), Elem(4), Elem(5)];
+        let mut v = fsdeq![Elem, Elem, Elem, Elem, Elem];
         assert_eq!(unsafe { DROPS }, 0);
         v.truncate_front(3);
         assert_eq!(unsafe { DROPS }, 2);
@@ -1680,6 +1808,7 @@ mod tests {
     #[should_panic]
     fn vec_slice_out_of_bounds_3() {
         let x = fsdeq![1, 2, 3, 4, 5];
+        #[expect(clippy::reversed_empty_ranges, reason = "Forcing panic")]
         let _ = &x[!0..4];
     }
 
@@ -1694,6 +1823,7 @@ mod tests {
     #[should_panic]
     fn vec_slice_out_of_bounds_5() {
         let x = fsdeq![1, 2, 3, 4, 5];
+        #[expect(clippy::reversed_empty_ranges, reason = "Forcing panic")]
         let _ = &x[3..2];
     }
 
@@ -1903,7 +2033,7 @@ mod tests {
     #[test]
     fn into_inner() {
         let fdeque = fsdeq![1, 2, 3];
-        let deque = slice_deque::sdeq![1, 2, 3];
+        let deque = VecDeque::from(vec![1, 2, 3]);
         assert_eq!(fdeque.into_inner(), deque);
     }
 
@@ -2154,6 +2284,7 @@ mod tests {
         for i in 1..4 {
             deq.push_front(i);
         }
+        #[expect(clippy::no_effect, reason = "This is just to make it panic")]
         deq[3];
     }
 
@@ -2247,7 +2378,7 @@ mod tests {
     #[test]
     fn vecdeque_rev_iter() {
         let mut d = FixedSliceDeque::new(10);
-        assert_eq!(d.iter().rev().next(), None);
+        assert_eq!(d.iter().next_back(), None);
 
         for i in 0..5 {
             d.push_back(i);
@@ -2267,7 +2398,7 @@ mod tests {
     #[test]
     fn vecdeque_mut_rev_iter_wrap() {
         let mut d = FixedSliceDeque::new(3);
-        assert!(d.iter_mut().rev().next().is_none());
+        assert!(d.iter_mut().next_back().is_none());
 
         d.push_back(1);
         d.push_back(2);
@@ -2307,7 +2438,7 @@ mod tests {
     #[test]
     fn vecdeque_mut_rev_iter() {
         let mut d = FixedSliceDeque::new(3);
-        assert!(d.iter_mut().rev().next().is_none());
+        assert!(d.iter_mut().next_back().is_none());
 
         for i in 0..3 {
             d.push_front(i);
