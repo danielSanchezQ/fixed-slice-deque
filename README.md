@@ -8,7 +8,7 @@
 ### Add the library dependency
 ```toml
 [dependencies]
-fixed-slice-deque = "0.1.0-beta2"
+fixed-slice-deque = "0.1.0-beta3"
 ```
 
 
@@ -77,11 +77,9 @@ operations.
  +---+---+---+
 ```
 
- It is implemented as a wrapper over `SliceDeque` [**`slice-deque`** crate](<https://crates.io/crates/slice-deque>)
+ It is implemented as a wrapper over [**`VecDeque`**](https://doc.rust-lang.org/std/collections/struct.VecDeque.html)
 
- Almost every orignal `SliceDeque` method is wrapped.
- Please refer to it's twin method [documentation](https://docs.rs/slice-deque/latest/slice_deque/)
- for internal functionality.
+ This is heavely inspired by `SliceDeque` and almos every orignal `SliceDeque` method is implemented.
 
 ## License
 
