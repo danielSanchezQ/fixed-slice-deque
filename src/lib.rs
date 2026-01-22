@@ -2180,8 +2180,9 @@ mod tests {
 
         {
             //                [xxxxxxxxxx+++++++++++]
-            let mut deq =
-                fsdeq![2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19,];
+            let mut deq = fsdeq![
+                2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19,
+            ];
 
             let removed = deq
                 .drain_filter(|x| *x % 2 == 0)
@@ -2195,8 +2196,9 @@ mod tests {
 
         {
             //                [+++++++++++xxxxxxxxxx]
-            let mut deq =
-                fsdeq![1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,];
+            let mut deq = fsdeq![
+                1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
+            ];
 
             let removed = deq
                 .drain_filter(|x| *x % 2 == 0)
