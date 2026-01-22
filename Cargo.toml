@@ -1,9 +1,9 @@
 [package]
 name = "fixed-slice-deque"
-version = "0.1.0-beta3"
+version = "0.1.0-beta4"
 authors = ["danielsanchezq <sanchez.quiros.daniel@gmail.com>"]
-edition = "2021"
-license-file = "LICENSE"
+edition = "2024"
+license-file = "LICENSE.txt"
 readme = "README.md"
 description = "A fixed size deque implementation"
 documentation = "https://docs.rs/crate/fixed-slice-deque/"
